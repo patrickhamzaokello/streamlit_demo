@@ -87,11 +87,21 @@ def failedTransactions(processed_data):
 
     return failed_data
 
-def interactive_plot(dataframe):
-    x_axis_val = st.selectbox('Select X - Axis Value', options = dataframe.columns)
-    y_axis_val = st.selectbox('Select Y - Axis Value', options = dataframe.columns)
-    plot = px.scatter(dataframe , x=x_axis_val, y=y_axis_val)
-    st.plotly_chart(plot)
+def interactive_plot(df):
+    df['YearMonth'] = df['PaymentDate'].dt.to_period('M')
+    monthly_counts = df['YearMonth'].value_counts().sort_index()
+
+    # Create a Streamlit app
+    st.title('Monthly Transaction Count')
+
+    # Create a bar graph using Plotly with month names on the x-axis
+    fig = px.bar(
+        x=monthly_counts.index.strftime('%b'),  # Format month names
+        y=monthly_counts.values,
+        labels={'x': 'Month', 'y': 'Transaction Count'}
+    )
+
+    st.plotly_chart(fig)
 
 if csv_file is not None:
     data_load_state = st.sidebar.text('Loading data...')
@@ -102,23 +112,13 @@ if csv_file is not None:
     successful_data_v = successfulTransaction(processed_data_v)
     failed_data_v = failedTransactions(processed_data_v)
 
-    col1, col2, col3, col4 = st.columns((2,1,1,1))
+    col1, col2, col3 = st.columns((2,1,1))
     
     
     with col1:
-        st.subheader("Total Transaction Count for Each Month")
-        successful_data_v['YearMonth'] = successful_data_v[PAYMENT_DATE_COLUMN].dt.month
-        monthly_counts = successful_data_v['YearMonth'].value_counts().sort_index()
+        interactive_plot(successful_data_v)
 
 
-    with col2:
-        st.subheader("Top Day")
-
-    with col3:
-        st.subheader("Top Day")
-
-    with col4:
-        st.subheader("Top Day")
 
     tab1, tab2, tab3, tab4 = st.tabs(["Raw Data", "Processed", "Successful Transactions", "Failed Transactions"])
 
