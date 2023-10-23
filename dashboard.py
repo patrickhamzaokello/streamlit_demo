@@ -130,7 +130,7 @@ if csv_file is not None:
 
     with st.container():
 
-        st.subheader('Quarter Transaction Summary')
+        st.subheader('Quarterly Transaction Summary')
         col3,col1, col2 = st.columns([1,2,2])
 
             
@@ -161,32 +161,39 @@ if csv_file is not None:
         with col3:
           
             st.write('**Total Transaction Count Per Quarter**')
-            st.write(quarterly_summary)
-
+            st.dataframe(quarterly_summary.style)
             st.write('**Total Transaction Amount Per Quarter**')
-            st.write(quarterly_volume_summary)
-
+            st.dataframe(quarterly_volume_summary.style)
+            
         with col1:
             successful_data_v['YearMonth'] = successful_data_v['PaymentDate'].dt.to_period('M')
             monthly_counts = successful_data_v['YearMonth'].value_counts().sort_index()
-
-            # Create a Streamlit app
-    
-            st.write('**Total Transaction Count by Month**')
 
             # Create a bar graph using Plotly with month names on the x-axis
             fig = px.bar(
                 x=monthly_counts.index.strftime('%b'),  # Format month names
                 y=monthly_counts.values,
-                labels={'x': 'Month', 'y': 'Transaction Count'}
+                labels={'x': 'Month', 'y': 'Transaction Count'},
+                color_discrete_sequence=px.colors.sequential.RdBu,
+            )
+
+            fig.update_layout(
+                title=f'Total Transaction Count by Month',
+                xaxis_title='Month',
+                yaxis_title='Count'
             )
 
             st.plotly_chart(fig,use_container_width=True)
 
         with col2:
-            st.write('**Percent of Transaction Total Count by Quarter**')
+        
             fig = px.pie(quarterly_summary, values='TransactionCount', names='Quarter', labels='Quarter', color_discrete_sequence=px.colors.sequential.RdBu)
             fig.update_traces(textposition='inside', textinfo='percent+label')
+            fig.update_layout(
+                title=f'Percent of Transaction Total Count by Quarter',
+                xaxis_title='Month',
+                yaxis_title='Count'
+            )
             st.plotly_chart(fig,use_container_width=True)
 
        
@@ -221,6 +228,9 @@ if csv_file is not None:
         with col1:
             fig = px.pie(filtered_data, values='Count', names='ProcessType', labels='ProcessType', color_discrete_sequence=px.colors.sequential.RdBu)
             fig.update_traces(textposition='inside', textinfo='percent+label')
+            fig.update_layout(
+                title=f'Percent of each Process Type Contribution to Total Transaction Count',
+            )
             st.plotly_chart(fig,use_container_width=True)
 
         with col2:
@@ -247,6 +257,40 @@ if csv_file is not None:
 
         st.markdown("---")
 
+
+    with st.container():
+        st.subheader("Top Day of the Week")
+
+        col1, col2 = st.columns([1,2])
+        ordered_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        grouped_data = successful_data_v.groupby(['ProcessType_Description', successful_data_v['PaymentDate'].dt.day_name()]).size().reset_index(name='Count')
+
+        with col1:
+            st.write(grouped_data)
+
+        with col2:
+            # Create a stacked bar graph using Plotly Express
+            fig = px.bar(
+                grouped_data, 
+                x='PaymentDate', 
+                y='Count', 
+                color='ProcessType_Description', 
+                labels={'Count': 'Total Count'},
+                category_orders={'PaymentDate': ordered_days} ,
+                color_discrete_sequence=px.colors.sequential.RdBu,
+                )
+
+            # Customize the layout
+            fig.update_layout(
+                title='Total Count of Each ProcessType Description Grouped by Day of the Week',
+                xaxis_title='Day of the Week',
+                yaxis_title='Total Count'
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
+
+    st.markdown("---")
 
     with st.container():
         st.subheader("Transaction Data Tables")
