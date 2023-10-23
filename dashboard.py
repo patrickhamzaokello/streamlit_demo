@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import calendar
 import plotly_express as px 
+import humanize
 
 st.set_page_config(
     page_title="GAPS Dasbboard View",
@@ -87,21 +88,6 @@ def failedTransactions(processed_data):
 
     return failed_data
 
-def interactive_plot(df):
-    df['YearMonth'] = df['PaymentDate'].dt.to_period('M')
-    monthly_counts = df['YearMonth'].value_counts().sort_index()
-
-    # Create a Streamlit app
-    st.title('Monthly Transaction Count')
-
-    # Create a bar graph using Plotly with month names on the x-axis
-    fig = px.bar(
-        x=monthly_counts.index.strftime('%b'),  # Format month names
-        y=monthly_counts.values,
-        labels={'x': 'Month', 'y': 'Transaction Count'}
-    )
-
-    st.plotly_chart(fig)
 
 if csv_file is not None:
     data_load_state = st.sidebar.text('Loading data...')
@@ -112,33 +98,160 @@ if csv_file is not None:
     successful_data_v = successfulTransaction(processed_data_v)
     failed_data_v = failedTransactions(processed_data_v)
 
-    col1, col2, col3 = st.columns((2,1,1))
-    
-    
-    with col1:
-        interactive_plot(successful_data_v)
+    total_amount_v = successful_data_v['Amount'].sum()
+    Total_v = len(processed_data_v)
+    success_v = len(successful_data_v)
+    failed_v = len(failed_data_v)
+
+    users_v = data['CompanyName'].nunique()
+    Transaction_types_v = data['ProcessType'].nunique()
+
+    success_percent = str(round(success_v / Total_v * 100, 2))
+    failed_v_percent = str(round(failed_v / Total_v * 100, 2))
+
+    with st.container():
+        col1, col2, col3, col4, col5 = st.columns(5)
+
+        with col1:
+            st.metric(label="Total Count", value=str("{:,.0f}".format(Total_v)))
+            st.metric(label="Total Amount", value=str(humanize.intword(total_amount_v)))
+        with col2:
+            st.metric(label=f"Successful Transaction Count", value=str("{:,.0f}".format(success_v)), delta = f"+ Success  - ({success_percent} %)" )
+        with col3:
+            st.metric(label=f"Failed Transactions Count", value=str( "{:,.0f}".format(failed_v)) , delta = f"- Failed - ({failed_v_percent} %)" )
+        with col4:
+            st.metric(label="Total Users", value=str(users_v) )
+        with col5:
+            st.metric(label="Transaction Types", value=str(Transaction_types_v))
+     
 
 
+        st.markdown("---")
 
-    tab1, tab2, tab3, tab4 = st.tabs(["Raw Data", "Processed", "Successful Transactions", "Failed Transactions"])
+    with st.container():
 
-    st.sidebar.text("Gaps Data Filter")
-    if st.sidebar.checkbox('Raw data'):
-        with tab1:
-            st.subheader(f'Raw data ({len(data)})')
-            st.write(data)
+        col1, col2 = st.columns(2)
 
-    if st.sidebar.checkbox(f'({len(processed_data_v)}) Processed data'):
-        with tab2:
-            st.subheader(f'Processed data ({len(processed_data_v)})')
-            st.write(processed_data_v)
+        with col1:
+            successful_data_v['YearMonth'] = successful_data_v['PaymentDate'].dt.to_period('M')
+            monthly_counts = successful_data_v['YearMonth'].value_counts().sort_index()
 
-    if st.sidebar.checkbox(f'({len(successful_data_v)}) Successful Transactions'):
-        with tab3:
-            st.subheader(f'Successful Transactions ({len(successful_data_v)})')
-            st.write(successful_data_v)
+            # Create a Streamlit app
+            st.subheader('Transaction Count')
+            st.write('**Total Transaction Count by Month**')
 
-    if st.sidebar.checkbox(f'({len(failed_data_v)}) Failed Transactions'):
-        with tab4:
-            st.subheader(f'Failed Transactions ({len(failed_data_v)}) ')
-            st.write(failed_data_v)
+            # Create a bar graph using Plotly with month names on the x-axis
+            fig = px.bar(
+                x=monthly_counts.index.strftime('%b'),  # Format month names
+                y=monthly_counts.values,
+                labels={'x': 'Month', 'y': 'Transaction Count'}
+            )
+
+            st.plotly_chart(fig,use_container_width=True)
+
+        with col2:
+            # Assuming you already have the 'successful_data_v' DataFrame
+            successful_data_v['PaymentDate'] = pd.to_datetime(successful_data_v['PaymentDate'])
+
+            # Resample the data to quarterly counts
+            quarterly_counts = successful_data_v.resample('Q', on='PaymentDate').size()
+
+            # Calculate the total amount per quarter
+            quarterly_total_amount = successful_data_v.resample('Q', on='PaymentDate')['Amount'].sum()
+
+            # Get the labels for quarters
+            quarter_labels = ['Q1', 'Q2', 'Q3', 'Q4']
+
+            # Create a new DataFrame with counts, total amount, and labels
+            quarterly_summary = pd.DataFrame({
+                'Quarter': quarter_labels,
+                'TransactionCount': quarterly_counts,
+                'TotalAmount': quarterly_total_amount
+            })
+
+
+            st.subheader('Quarter Transaction Summary')
+            st.write('**Total Transaction Count & Amount Per Quarter**')
+            st.write(quarterly_summary)
+
+
+            st.write('**Percent of Transaction Total Count by Quarter**')
+            fig = px.pie(quarterly_summary, values='TransactionCount', names='Quarter', labels='Quarter', color_discrete_sequence=px.colors.sequential.RdBu)
+            fig.update_traces(textposition='inside', textinfo='percent+label')
+            st.plotly_chart(fig,use_container_width=True)
+
+       
+        st.markdown("---")
+
+
+    with st.container():
+        st.title("Transaction Types")
+        
+        
+        # Map 'ProcessType_Description' to 'ProcessType' in the DataFrame
+        process_type_monthly_counts = successful_data_v.copy()
+        process_type_monthly_counts['ProcessType'] = process_type_monthly_counts['ProcessType_Description']
+
+        # Group the data by 'ProcessType' and year-month of 'PaymentDate' and count the occurrences
+        process_type_monthly_counts = process_type_monthly_counts.groupby(['ProcessType', process_type_monthly_counts['PaymentDate'].dt.to_period('M')]).size().reset_index(name='Count')
+
+        # Format the 'PaymentDate' to 'YYYY-MM'
+        process_type_monthly_counts['PaymentDate'] = process_type_monthly_counts['PaymentDate'].dt.strftime('%Y-%m')
+
+        all_descriptions = process_type_monthly_counts['ProcessType'].unique()
+
+        # Streamlit filter for selecting 'ProcessType_Description' with multi-select checkboxes
+        selected_descriptions = st.multiselect('Select Process Type Descriptions', all_descriptions, default=all_descriptions)
+
+        # Filter the DataFrame based on the selected descriptions
+        filtered_data = process_type_monthly_counts[process_type_monthly_counts['ProcessType'].isin(selected_descriptions)]
+
+        col3,col1, col2, = st.columns([1,2,2])
+
+        with col1:
+            fig = px.pie(filtered_data, values='Count', names='ProcessType', labels='ProcessType', color_discrete_sequence=px.colors.sequential.RdBu)
+            fig.update_traces(textposition='inside', textinfo='percent+label')
+            st.plotly_chart(fig,use_container_width=True)
+
+        with col2:
+            fig = px.line(
+                filtered_data,
+                x='PaymentDate',
+                y='Count',
+                color='ProcessType',
+                line_group='ProcessType',
+                labels={'PaymentDate': 'Month'},
+                color_discrete_sequence=px.colors.sequential.RdBu
+            )
+            fig.update_layout(
+                title=f'Total Count of Selected Process Type Descriptions Over Each Month',
+                xaxis_title='Month',
+                yaxis_title='Count'
+            )
+            
+            st.plotly_chart(fig,use_container_width=True)
+
+        with col3:
+            st.write(filtered_data)
+
+
+        st.markdown("---")
+
+    tab1, tab2, tab3, tab4 = st.tabs([f"Raw Data ({Total_v})", f"Processed ({Total_v})", f"Successful Transactions ({success_v})", f"Failed Transactions ({failed_v})"])
+    with tab1:
+        st.write('**Raw data**')
+        st.write(data)
+
+    with tab2:
+        st.write('**Processed data**')
+        st.write(processed_data_v)
+
+    with tab3:
+        st.write('**Successful Transactions**')
+        st.write(successful_data_v)
+
+    with tab4:
+        st.write('**Failed Transactions**')
+        st.write(failed_data_v)
+
+    st.markdown("---")
