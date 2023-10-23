@@ -130,14 +130,48 @@ if csv_file is not None:
 
     with st.container():
 
-        col1, col2 = st.columns(2)
+        st.subheader('Quarter Transaction Summary')
+        col3,col1, col2 = st.columns([1,2,2])
+
+            
+
+        # Resample the data to quarterly counts
+        quarterly_counts = successful_data_v.resample('Q', on='PaymentDate').size()
+
+        # Calculate the total amount per quarter
+        quarterly_total_amount = successful_data_v.resample('Q', on='PaymentDate')['Amount'].sum()
+
+        # Get the labels for quarters
+        quarter_labels = ['Q1', 'Q2', 'Q3', 'Q4']
+
+        # Create a new DataFrame with counts, total amount, and labels
+        quarterly_summary = pd.DataFrame({
+            'Quarter': quarter_labels,
+            'TransactionCount': quarterly_counts,
+        })
+
+
+        quarterly_volume_summary = pd.DataFrame({
+            'Quarter': quarter_labels,
+            'TotalAmount': quarterly_total_amount
+        })
+
+
+
+        with col3:
+          
+            st.write('**Total Transaction Count Per Quarter**')
+            st.write(quarterly_summary)
+
+            st.write('**Total Transaction Amount Per Quarter**')
+            st.write(quarterly_volume_summary)
 
         with col1:
             successful_data_v['YearMonth'] = successful_data_v['PaymentDate'].dt.to_period('M')
             monthly_counts = successful_data_v['YearMonth'].value_counts().sort_index()
 
             # Create a Streamlit app
-            st.subheader('Transaction Count')
+    
             st.write('**Total Transaction Count by Month**')
 
             # Create a bar graph using Plotly with month names on the x-axis
@@ -150,31 +184,6 @@ if csv_file is not None:
             st.plotly_chart(fig,use_container_width=True)
 
         with col2:
-            # Assuming you already have the 'successful_data_v' DataFrame
-            successful_data_v['PaymentDate'] = pd.to_datetime(successful_data_v['PaymentDate'])
-
-            # Resample the data to quarterly counts
-            quarterly_counts = successful_data_v.resample('Q', on='PaymentDate').size()
-
-            # Calculate the total amount per quarter
-            quarterly_total_amount = successful_data_v.resample('Q', on='PaymentDate')['Amount'].sum()
-
-            # Get the labels for quarters
-            quarter_labels = ['Q1', 'Q2', 'Q3', 'Q4']
-
-            # Create a new DataFrame with counts, total amount, and labels
-            quarterly_summary = pd.DataFrame({
-                'Quarter': quarter_labels,
-                'TransactionCount': quarterly_counts,
-                'TotalAmount': quarterly_total_amount
-            })
-
-
-            st.subheader('Quarter Transaction Summary')
-            st.write('**Total Transaction Count & Amount Per Quarter**')
-            st.write(quarterly_summary)
-
-
             st.write('**Percent of Transaction Total Count by Quarter**')
             fig = px.pie(quarterly_summary, values='TransactionCount', names='Quarter', labels='Quarter', color_discrete_sequence=px.colors.sequential.RdBu)
             fig.update_traces(textposition='inside', textinfo='percent+label')
@@ -185,7 +194,8 @@ if csv_file is not None:
 
 
     with st.container():
-        st.title("Transaction Types")
+
+        st.subheader("Transaction Types")
         
         
         # Map 'ProcessType_Description' to 'ProcessType' in the DataFrame
@@ -232,26 +242,30 @@ if csv_file is not None:
             st.plotly_chart(fig,use_container_width=True)
 
         with col3:
-            st.write(filtered_data)
+            st.write(filtered_data,use_container_width=True)
 
 
         st.markdown("---")
 
-    tab1, tab2, tab3, tab4 = st.tabs([f"Raw Data ({Total_v})", f"Processed ({Total_v})", f"Successful Transactions ({success_v})", f"Failed Transactions ({failed_v})"])
-    with tab1:
-        st.write('**Raw data**')
-        st.write(data)
 
-    with tab2:
-        st.write('**Processed data**')
-        st.write(processed_data_v)
+    with st.container():
+        st.subheader("Transaction Data Tables")
 
-    with tab3:
-        st.write('**Successful Transactions**')
-        st.write(successful_data_v)
+        tab1, tab2, tab3, tab4 = st.tabs([f"Raw Data ({Total_v})", f"Processed ({Total_v})", f"Successful Transactions ({success_v})", f"Failed Transactions ({failed_v})"])
+        with tab1:
+            st.write('**Raw data**')
+            st.write(data)
 
-    with tab4:
-        st.write('**Failed Transactions**')
-        st.write(failed_data_v)
+        with tab2:
+            st.write('**Processed data**')
+            st.write(processed_data_v)
 
-    st.markdown("---")
+        with tab3:
+            st.write('**Successful Transactions**')
+            st.write(successful_data_v)
+
+        with tab4:
+            st.write('**Failed Transactions**')
+            st.write(failed_data_v)
+
+        st.markdown("---")
