@@ -23,20 +23,25 @@ st.sidebar.subheader('GAPS Dashboard')
 st.sidebar.divider()
 PAYMENT_DATE_COLUMN = "PaymentDate"
 PAID_DATE_COLUMN = "PaidDate"
+ordered_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 
 csv_file = st.sidebar.file_uploader("Upload a CSV file", type=["csv"] ,label_visibility="collapsed")
 st.sidebar.divider()
 
+@st.cache_data
 def load_data(csv_file_data):
     data = pd.read_csv(csv_file_data)
     data[PAYMENT_DATE_COLUMN] = pd.to_datetime(data[PAYMENT_DATE_COLUMN], format='mixed')
     data[PAID_DATE_COLUMN] = pd.to_datetime(data[PAID_DATE_COLUMN], format='mixed')
-    selected_year = st.sidebar.selectbox("Select a Year", sorted(data[PAYMENT_DATE_COLUMN].dt.year.unique()))
+    return data
+
+@st.cache_data
+def selectDataYear(selected_year, data):
     data = data[data[PAYMENT_DATE_COLUMN].dt.year == selected_year]
     return data
 
-
+@st.cache_data
 def processed_data(raw_data):
     process_type_mapping = pd.DataFrame({
         'ProcessType': [1, 10, 11, 12, 13, 14, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -88,11 +93,125 @@ def failedTransactions(processed_data):
 
     return failed_data
 
+@st.cache_data
+def Quarterly_Count_Pie_chart(quarterly_summary):    
+    fig = px.pie(quarterly_summary, values='TransactionCount', names='Quarter', labels='Quarter', color_discrete_sequence=px.colors.sequential.RdBu)
+    fig.update_traces(textposition='inside', textinfo='percent+label')
+    fig.update_layout(
+        title=f'Percent of Transaction Total Count by Quarter',
+        xaxis_title='Month',
+        yaxis_title='Count'
+    )
+    st.plotly_chart(fig,use_container_width=True)
+
+@st.cache_data
+def Monthly_count_bar_graph(successful_data_v):
+    successful_data_v['YearMonth'] = successful_data_v['PaymentDate'].dt.to_period('M')
+    monthly_counts = successful_data_v['YearMonth'].value_counts().sort_index()
+
+    # Create a bar graph using Plotly with month names on the x-axis
+    fig = px.bar(
+        x=monthly_counts.index.strftime('%b'),  # Format month names
+        y=monthly_counts.values,
+        labels={'x': 'Month', 'y': 'Transaction Count'},
+        color_discrete_sequence=px.colors.sequential.RdBu,
+    )
+
+    fig.update_layout(
+        title=f'Total Transaction Count by Month',
+        xaxis_title='Month',
+        yaxis_title='Count'
+    )
+
+    st.plotly_chart(fig,use_container_width=True)
+
+
+def Filtered_data(successful_data_v):
+    # Map 'ProcessType_Description' to 'ProcessType' in the DataFrame
+    process_type_monthly_counts = successful_data_v.copy()
+    process_type_monthly_counts['ProcessType'] = process_type_monthly_counts['ProcessType_Description']
+
+    # Group the data by 'ProcessType' and year-month of 'PaymentDate' and count the occurrences
+    process_type_monthly_counts = process_type_monthly_counts.groupby(['ProcessType', process_type_monthly_counts['PaymentDate'].dt.to_period('M')]).size().reset_index(name='Count')
+
+    # Format the 'PaymentDate' to 'YYYY-MM'
+    process_type_monthly_counts['PaymentDate'] = process_type_monthly_counts['PaymentDate'].dt.strftime('%Y-%m')
+
+    all_descriptions = process_type_monthly_counts['ProcessType'].unique()
+
+    # Streamlit filter for selecting 'ProcessType_Description' with multi-select checkboxes
+    selected_descriptions = st.multiselect('Select Process Type Descriptions', all_descriptions, default=all_descriptions)
+
+    # Filter the DataFrame based on the selected descriptions
+    filtered_data = process_type_monthly_counts[process_type_monthly_counts['ProcessType'].isin(selected_descriptions)]
+
+    return filtered_data
+
+@st.cache_data
+def PieChartProcessTypes(filtered_data):
+    fig = px.pie(filtered_data, values='Count', names='ProcessType', labels='ProcessType', color_discrete_sequence=px.colors.sequential.RdBu)
+    fig.update_traces(textposition='inside', textinfo='percent+label')
+    fig.update_layout(
+        title=f'Percent of each Process Type Contribution to Total Transaction Count',
+    )
+    st.plotly_chart(fig,use_container_width=True)
+
+@st.cache_data
+def ProcessTypeLineGraph(filtered_data):
+    fig = px.line(
+        filtered_data,
+        x='PaymentDate',
+        y='Count',
+        color='ProcessType',
+        line_group='ProcessType',
+        labels={'PaymentDate': 'Month'},
+        color_discrete_sequence=px.colors.sequential.RdBu
+    )
+    fig.update_layout(
+        title=f'Total Count of Selected Process Type Descriptions Over Each Month',
+        xaxis_title='Month',
+        yaxis_title='Count'
+    )
+    
+    st.plotly_chart(fig,use_container_width=True)
+
+
+@st.cache_data
+def Grouped_data_dayOfWeek(successful_data_v):
+    week_day_name_count = successful_data_v.groupby(['ProcessType_Description', successful_data_v['PaymentDate'].dt.day_name()]).size().reset_index(name='Count')
+
+    return week_day_name_count
+
+
+@st.cache_data
+def TopDayOfWeekPlot(grouped_data,ordered_days):
+    fig = px.bar(
+        grouped_data, 
+        x='PaymentDate', 
+        y='Count', 
+        color='ProcessType_Description', 
+        labels={'Count': 'Total Count'},
+        category_orders={'PaymentDate': ordered_days} ,
+        color_discrete_sequence=px.colors.sequential.RdBu,
+        )
+
+    # Customize the layout
+    fig.update_layout(
+        title='Total Count of Each ProcessType Description Grouped by Day of the Week',
+        xaxis_title='Day of the Week',
+        yaxis_title='Total Count'
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
 
 if csv_file is not None:
     data_load_state = st.sidebar.text('Loading data...')
     data = load_data(csv_file)
     data_load_state.text("Done! (Loaded Successfully)")
+
+    selected_year = st.sidebar.selectbox("Select a Year", sorted(data[PAYMENT_DATE_COLUMN].dt.year.unique()))
+    data = selectDataYear(selected_year, data)
 
     processed_data_v = processed_data(data)
     successful_data_v = successfulTransaction(processed_data_v)
@@ -166,36 +285,10 @@ if csv_file is not None:
             st.dataframe(quarterly_volume_summary.style)
             
         with col1:
-            successful_data_v['YearMonth'] = successful_data_v['PaymentDate'].dt.to_period('M')
-            monthly_counts = successful_data_v['YearMonth'].value_counts().sort_index()
-
-            # Create a bar graph using Plotly with month names on the x-axis
-            fig = px.bar(
-                x=monthly_counts.index.strftime('%b'),  # Format month names
-                y=monthly_counts.values,
-                labels={'x': 'Month', 'y': 'Transaction Count'},
-                color_discrete_sequence=px.colors.sequential.RdBu,
-            )
-
-            fig.update_layout(
-                title=f'Total Transaction Count by Month',
-                xaxis_title='Month',
-                yaxis_title='Count'
-            )
-
-            st.plotly_chart(fig,use_container_width=True)
+            Monthly_count_bar_graph(successful_data_v)
 
         with col2:
-        
-            fig = px.pie(quarterly_summary, values='TransactionCount', names='Quarter', labels='Quarter', color_discrete_sequence=px.colors.sequential.RdBu)
-            fig.update_traces(textposition='inside', textinfo='percent+label')
-            fig.update_layout(
-                title=f'Percent of Transaction Total Count by Quarter',
-                xaxis_title='Month',
-                yaxis_title='Count'
-            )
-            st.plotly_chart(fig,use_container_width=True)
-
+            Quarterly_Count_Pie_chart(quarterly_summary)
        
         st.markdown("---")
 
@@ -203,57 +296,18 @@ if csv_file is not None:
     with st.container():
 
         st.subheader("Transaction Types")
-        
-        
-        # Map 'ProcessType_Description' to 'ProcessType' in the DataFrame
-        process_type_monthly_counts = successful_data_v.copy()
-        process_type_monthly_counts['ProcessType'] = process_type_monthly_counts['ProcessType_Description']
-
-        # Group the data by 'ProcessType' and year-month of 'PaymentDate' and count the occurrences
-        process_type_monthly_counts = process_type_monthly_counts.groupby(['ProcessType', process_type_monthly_counts['PaymentDate'].dt.to_period('M')]).size().reset_index(name='Count')
-
-        # Format the 'PaymentDate' to 'YYYY-MM'
-        process_type_monthly_counts['PaymentDate'] = process_type_monthly_counts['PaymentDate'].dt.strftime('%Y-%m')
-
-        all_descriptions = process_type_monthly_counts['ProcessType'].unique()
-
-        # Streamlit filter for selecting 'ProcessType_Description' with multi-select checkboxes
-        selected_descriptions = st.multiselect('Select Process Type Descriptions', all_descriptions, default=all_descriptions)
-
-        # Filter the DataFrame based on the selected descriptions
-        filtered_data = process_type_monthly_counts[process_type_monthly_counts['ProcessType'].isin(selected_descriptions)]
+        filtered_table = Filtered_data(successful_data_v)
 
         col3,col1, col2, = st.columns([1,2,2])
 
         with col1:
-            fig = px.pie(filtered_data, values='Count', names='ProcessType', labels='ProcessType', color_discrete_sequence=px.colors.sequential.RdBu)
-            fig.update_traces(textposition='inside', textinfo='percent+label')
-            fig.update_layout(
-                title=f'Percent of each Process Type Contribution to Total Transaction Count',
-            )
-            st.plotly_chart(fig,use_container_width=True)
+            PieChartProcessTypes(filtered_table)
 
         with col2:
-            fig = px.line(
-                filtered_data,
-                x='PaymentDate',
-                y='Count',
-                color='ProcessType',
-                line_group='ProcessType',
-                labels={'PaymentDate': 'Month'},
-                color_discrete_sequence=px.colors.sequential.RdBu
-            )
-            fig.update_layout(
-                title=f'Total Count of Selected Process Type Descriptions Over Each Month',
-                xaxis_title='Month',
-                yaxis_title='Count'
-            )
-            
-            st.plotly_chart(fig,use_container_width=True)
+            ProcessTypeLineGraph(filtered_table)
 
         with col3:
-            st.write(filtered_data,use_container_width=True)
-
+            st.write(filtered_table,use_container_width=True)
 
         st.markdown("---")
 
@@ -262,39 +316,20 @@ if csv_file is not None:
         st.subheader("Top Day of the Week")
 
         col1, col2 = st.columns([1,2])
-        ordered_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        grouped_data = successful_data_v.groupby(['ProcessType_Description', successful_data_v['PaymentDate'].dt.day_name()]).size().reset_index(name='Count')
+       
+        week_day_transaction_count = Grouped_data_dayOfWeek(successful_data_v)
 
         with col1:
-            st.write(grouped_data)
+            st.write(week_day_transaction_count)
 
         with col2:
-            # Create a stacked bar graph using Plotly Express
-            fig = px.bar(
-                grouped_data, 
-                x='PaymentDate', 
-                y='Count', 
-                color='ProcessType_Description', 
-                labels={'Count': 'Total Count'},
-                category_orders={'PaymentDate': ordered_days} ,
-                color_discrete_sequence=px.colors.sequential.RdBu,
-                )
-
-            # Customize the layout
-            fig.update_layout(
-                title='Total Count of Each ProcessType Description Grouped by Day of the Week',
-                xaxis_title='Day of the Week',
-                yaxis_title='Total Count'
-            )
-
-            st.plotly_chart(fig, use_container_width=True)
+            TopDayOfWeekPlot(week_day_transaction_count, ordered_days)
 
 
     st.markdown("---")
 
     with st.container():
         st.subheader("Transaction Data Tables")
-
         tab1, tab2, tab3, tab4 = st.tabs([f"Raw Data ({Total_v})", f"Processed ({Total_v})", f"Successful Transactions ({success_v})", f"Failed Transactions ({failed_v})"])
         with tab1:
             st.write('**Raw data**')
