@@ -95,7 +95,10 @@ def failedTransactions(processed_data):
 
 @st.cache_data
 def Quarterly_Count_Pie_chart(quarterly_summary):    
-    fig = px.pie(quarterly_summary, values='TransactionCount', names='Quarter', labels='Quarter', color_discrete_sequence=px.colors.sequential.RdBu)
+    fig = px.pie(quarterly_summary, 
+                 values='TransactionCount', names='Quarter', 
+                 labels='Quarter', 
+                 color_discrete_sequence=px.colors.sequential.Aggrnyl)
     fig.update_traces(textposition='inside', textinfo='percent+label')
     fig.update_layout(
         title=f'Percent of Transaction Total Count by Quarter',
@@ -114,7 +117,7 @@ def Monthly_count_bar_graph(successful_data_v):
         x=monthly_counts.index.strftime('%b'),  # Format month names
         y=monthly_counts.values,
         labels={'x': 'Month', 'y': 'Transaction Count'},
-        color_discrete_sequence=px.colors.sequential.RdBu,
+        color_discrete_sequence=px.colors.sequential.Aggrnyl,
     )
 
     fig.update_layout(
@@ -149,7 +152,12 @@ def Filtered_data(successful_data_v):
 
 @st.cache_data
 def PieChartProcessTypes(filtered_data):
-    fig = px.pie(filtered_data, values='Count', names='ProcessType', labels='ProcessType', color_discrete_sequence=px.colors.sequential.RdBu)
+    fig = px.pie(
+        filtered_data, 
+        values='Count', 
+        names='ProcessType', labels='ProcessType', 
+        color_discrete_sequence=px.colors.sequential.Aggrnyl
+        )
     fig.update_traces(textposition='inside', textinfo='percent+label')
     fig.update_layout(
         title=f'Percent of each Process Type Contribution to Total Transaction Count',
@@ -165,7 +173,7 @@ def ProcessTypeLineGraph(filtered_data):
         color='ProcessType',
         line_group='ProcessType',
         labels={'PaymentDate': 'Month'},
-        color_discrete_sequence=px.colors.sequential.RdBu
+        color_discrete_sequence=px.colors.sequential.Aggrnyl
     )
     fig.update_layout(
         title=f'Total Count of Selected Process Type Descriptions Over Each Month',
@@ -192,7 +200,7 @@ def TopDayOfWeekPlot(grouped_data,ordered_days):
         color='ProcessType_Description', 
         labels={'Count': 'Total Count'},
         category_orders={'PaymentDate': ordered_days} ,
-        color_discrete_sequence=px.colors.sequential.RdBu,
+        color_discrete_sequence=px.colors.sequential.Aggrnyl,
         )
 
     # Customize the layout
