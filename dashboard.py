@@ -327,6 +327,16 @@ def growthTrendGraph(pivoted_data_table):
     st.plotly_chart(bar_fig, use_container_width=True)
 
 
+def usersTop(processed_data_v,number):
+    user_counts = processed_data_v['CompanyName'].value_counts()
+
+    # Sort the user counts in descending order to get the top users
+    top_users = user_counts.head(number)  # You can adjust the number to display more or fewer top user
+
+    # Display the top users and their transaction counts
+    st.write(f'**Top {number} Companies with the Most Transaction Counts**')
+    for i, (user, count) in enumerate(top_users.items(), 1):
+        st.write(f'{i}. {user}: **{"{:,.0f}".format(count)}** Transactions')
 
 
 if csv_file is not None:
@@ -366,7 +376,9 @@ if csv_file is not None:
     un_successful_v = not_declined_v - success_v
 
     
-    Transaction_types_v = processed_data_v['ProcessType'].nunique()
+    Transaction_types_v = processed_data_v['ProcessType_Description'].nunique()
+    process_descriptions = processed_data_v['ProcessType_Description'].unique()
+    process_descriptions_str = ', '.join(process_descriptions)
 
 
 
@@ -380,22 +392,27 @@ if csv_file is not None:
        
         st.markdown("---")
         st.subheader("Metrics")
-        col1, col2, col4, col5 = st.columns(4)
+        col1, col2, col4 = st.columns([1,1,2])
 
         with col1:
             st.metric(label=f"Total Count ({selected_year})", value=str("{:,.0f}".format(Total_v)))
             st.metric(label=f"Total Transaction Amount ({selected_year})", value=str(humanize.intword(total_amount_v)))
+
+            st.metric(label="Transaction Types", value=str(Transaction_types_v))
+            st.write(f"**Transaction Types Labels** ({process_descriptions_str})")
+    
         with col2:
-            st.metric(label=f"Processed Transactions ", value=str("{:,.0f}".format(success_v)),delta = f"({success_v_percent} %) of Total Count" )
-            st.metric(label=f"Un-Processed Transactions ", value=str("{:,.0f}".format(un_successful_v)), delta_color="off",delta = f"- ({un_successful_v_percent} %) of Total Count" )
-            st.metric(label=f"Declined Transactions Count ", value=str( "{:,.0f}".format(declined_v)) , delta = f"- ({declined_v_percent} %) of Total Count" )
+            st.metric(label=f"Total Processed Transaction Count ", value=str("{:,.0f}".format(success_v)),delta = f"({success_v_percent} %) of Total Count" )
+            st.metric(label=f"Total Un-Processed Transaction Count ", value=str("{:,.0f}".format(un_successful_v)), delta_color="off",delta = f"- ({un_successful_v_percent} %) of Total Count" )
+            st.metric(label=f"Total Declined Transaction Count ", value=str( "{:,.0f}".format(declined_v)) , delta = f"- ({declined_v_percent} %) of Total Count" )
         # with col3:
         #     st.metric(label=f"UnDeclined Transaction Count ", value=str("{:,.0f}".format(not_declined_v)), delta = f"+ UnDeclined  - ({undeclined_percent} %)" )
         with col4:
-            st.metric(label=f"Total Companies", value=str(users_v) )
-        with col5:
-            st.metric(label="Transaction Types", value=str(Transaction_types_v))
-    
+            st.metric(label=f"Total Number of Companies on GAPS", value=str(users_v) )
+            # number_to_display = st.slider('Select the number of customers to show', min_value=1, max_value=len(successful_data_v['CompanyName'].unique()), value=10)
+            number_to_display = 4
+            usersTop(successful_data_v, number_to_display)
+
 
 
     with st.container():
