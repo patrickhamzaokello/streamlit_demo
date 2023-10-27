@@ -139,6 +139,24 @@ def Monthly_count_bar_graph(successful_data_v):
 
     st.plotly_chart(fig,use_container_width=True)
 
+@st.cache_data
+def Quarterly_count_bar_graph(quarterly_data_v):
+
+    # Create a bar graph using Plotly with month names on the x-axis
+    fig = px.bar(quarterly_data_v,
+        x='Quarter',  # Format month names
+        y='TransactionCount',
+        labels={'x': 'Quarter', 'y': 'Transaction Count'},
+        color_discrete_sequence=px.colors.sequential.Aggrnyl,
+    )
+
+    fig.update_layout(
+        title=f'Bar Graph of Total Transaction Count For Each Quarter',
+        xaxis_title='Quarter',
+        yaxis_title='Transaction Count'
+    )
+
+    st.plotly_chart(fig,use_container_width=True)
 
 def Filtered_data(successful_data_v):
     # Map 'ProcessType_Description' to 'ProcessType' in the DataFrame
@@ -171,7 +189,7 @@ def PieChartProcessTypes(filtered_data):
         )
     fig.update_traces(textposition='inside', textinfo='percent+label')
     fig.update_layout(
-        title=f'Percent of each Process Type Contribution to Total Transaction Count',
+        title=f'Process Type Contribution',
         legend=dict(orientation='v', y=1, x=-0.1),
     )
     st.plotly_chart(fig,use_container_width=True)
@@ -196,12 +214,46 @@ def ProcessTypeLineGraph(filtered_data):
     
     st.plotly_chart(fig,use_container_width=True)
 
+@st.cache_data
+def ProcessTypeBarGraph(filtered_data):
+    # Pivot the DataFrame to create a suitable format for the grouped bar graph
+    pivoted_data = filtered_data.pivot(index=PAYMENT_DATE_COLUMN, columns='ProcessType', values='Count')
+
+    # If there are missing values in the pivoted data, replace them with 0
+    pivoted_data = pivoted_data.fillna(0)
+
+    # Create a grouped bar graph using Plotly Express
+    fig = px.bar(pivoted_data, x=pivoted_data.index, 
+                 y=pivoted_data.columns, 
+                 title='Monthly Transaction Count by Process Type', 
+                 text='ProcessType',
+                 color_discrete_sequence=px.colors.sequential.Aggrnyl
+                 )
+    
+    # Customize the plot
+    fig.update_xaxes(title_text='Month')
+    fig.update_yaxes(title_text='Transaction Count')
+    fig.update_traces(texttemplate='%{text}', textposition='outside')  # Add labels on each bar
+
+    # Use Streamlit to display the Plotly figure
+    st.plotly_chart(fig,use_container_width=True)
+
 
 @st.cache_data
 def Grouped_data_dayOfWeek(successful_data_v):
     week_day_name_count = successful_data_v.groupby(['ProcessType_Description', successful_data_v[PAYMENT_DATE_COLUMN].dt.day_name()]).size().reset_index(name='Count')
 
     return week_day_name_count
+
+
+def PivotWeekDayPrcessType(week_day_name_count):
+    pivoted_Week_data = week_day_name_count.pivot(index=PAYMENT_DATE_COLUMN, columns='ProcessType_Description', values='Count')
+    pivoted_Week_data = pivoted_Week_data.fillna(0)
+
+    # pivoted_Week_data['Daily_Total'] = pivoted_Week_data.sum(axis=1)
+
+    return pivoted_Week_data
+
 
 
 @st.cache_data
@@ -212,6 +264,7 @@ def TopDayOfWeekPlot(grouped_data,ordered_days):
         y='Count', 
         color='ProcessType_Description', 
         labels={'Count': 'Total Count'},
+        text='ProcessType_Description',
         category_orders={PAYMENT_DATE_COLUMN: ordered_days} ,
         color_discrete_sequence=px.colors.sequential.Aggrnyl,
         )
@@ -226,6 +279,54 @@ def TopDayOfWeekPlot(grouped_data,ordered_days):
     
 
     st.plotly_chart(fig, use_container_width=True)
+
+
+def GrowthTrend(filtered_data):
+   # Pivot the DataFrame to create a suitable format for the grouped bar graph
+    pivoted_data = filtered_data.pivot(index=PAYMENT_DATE_COLUMN, columns='ProcessType', values='Count')
+
+    # If there are missing values in the pivoted data, replace them with 0
+    pivoted_data = pivoted_data.fillna(0)
+
+    monthly_total_counts = pivoted_data.sum(axis=1)
+    # Calculate the number of process types (columns) for each month
+    # num_process_types = pivoted_data.gt(0).sum(axis=1)  # Count non-zero values (non-missing data)
+    num_process_types = pivoted_data.count(axis=1)
+    pivoted_data['MonthlyTotalCounts'] = monthly_total_counts
+    # pivoted_data['NumProcessTypes'] = num_process_types
+
+
+    # Calculate the monthly average transaction count
+    pivoted_data['MonthlyAverageCounts'] = (monthly_total_counts / num_process_types).round()
+
+    # pivoted_data['PercentageChange'] = 
+
+    pivoted_data['AverageChange'] = pivoted_data['MonthlyAverageCounts'].diff()
+    pivoted_data['AverageChange'].iloc[0] = 0
+
+
+    pivoted_data['PercentageChange'] = ((pivoted_data['MonthlyAverageCounts'] / pivoted_data['MonthlyAverageCounts'].shift(1) - 1) * 100).round()
+    pivoted_data['PercentageChange'].iloc[0] = 0  # Set the first value to 0
+
+
+    return pivoted_data
+
+
+
+def growthTrendGraph(pivoted_data_table):
+    # Create a bar graph for the monthly total counts
+    bar_fig = px.bar(pivoted_data_table, x=pivoted_data_table.index, y='MonthlyTotalCounts', 
+                     title='Monthly Transaction Count', text='MonthlyTotalCounts',   color_discrete_sequence=px.colors.sequential.Aggrnyl)
+    
+    # Customize the bar graph
+    bar_fig.update_xaxes(title_text='Month')
+    bar_fig.update_yaxes(title_text='Monthly Total Transaction Count', showline=False)  # Remove the y-axis line
+    bar_fig.update_traces(texttemplate='%{text}', textposition='outside')  # Add labels on each bar
+
+    # Use Streamlit to display the bar graph
+    st.plotly_chart(bar_fig, use_container_width=True)
+
+
 
 
 if csv_file is not None:
@@ -269,7 +370,8 @@ if csv_file is not None:
 
 
 
-    undeclined_percent = str(round(not_declined_v / Total_v * 100, 2))
+    success_v_percent = str(round(success_v / Total_v * 100, 2))
+    un_successful_v_percent = str(round(un_successful_v / Total_v * 100, 2))
     declined_v_percent = str(round(declined_v / Total_v * 100, 2))
 
     with st.container():
@@ -278,30 +380,72 @@ if csv_file is not None:
        
         st.markdown("---")
         st.subheader("Metrics")
-        col1, col2, col3, col4, col5 = st.columns(5)
+        col1, col2, col4, col5 = st.columns(4)
 
         with col1:
-            st.metric(label=f"Total Count", value=str("{:,.0f}".format(Total_v)))
-            st.metric(label=f"Total Amount", value=str(humanize.intword(total_amount_v)))
+            st.metric(label=f"Total Count ({selected_year})", value=str("{:,.0f}".format(Total_v)))
+            st.metric(label=f"Total Transaction Amount ({selected_year})", value=str(humanize.intword(total_amount_v)))
         with col2:
-            st.metric(label=f"UnDeclined Transaction Count ", value=str("{:,.0f}".format(not_declined_v)), delta = f"+ UnDeclined  - ({undeclined_percent} %)" )
-            st.metric(label=f"Processed Transactions ", value=str("{:,.0f}".format(success_v)))
-            st.metric(label=f"Un-Processed Transactions ", value=str("{:,.0f}".format(un_successful_v)))
-        with col3:
-            st.metric(label=f"Declined Transactions Count ", value=str( "{:,.0f}".format(declined_v)) , delta = f"- Declined - ({declined_v_percent} %)" )
+            st.metric(label=f"Processed Transactions ", value=str("{:,.0f}".format(success_v)),delta = f"({success_v_percent} %) of Total Count" )
+            st.metric(label=f"Un-Processed Transactions ", value=str("{:,.0f}".format(un_successful_v)), delta_color="off",delta = f"- ({un_successful_v_percent} %) of Total Count" )
+            st.metric(label=f"Declined Transactions Count ", value=str( "{:,.0f}".format(declined_v)) , delta = f"- ({declined_v_percent} %) of Total Count" )
+        # with col3:
+        #     st.metric(label=f"UnDeclined Transaction Count ", value=str("{:,.0f}".format(not_declined_v)), delta = f"+ UnDeclined  - ({undeclined_percent} %)" )
         with col4:
             st.metric(label=f"Total Companies", value=str(users_v) )
         with col5:
             st.metric(label="Transaction Types", value=str(Transaction_types_v))
-     
+    
 
-
-        st.markdown("---")
 
     with st.container():
 
-        st.subheader('Quarterly Transaction Summary')
-        col3,col1, col2 = st.columns([1,2,2])
+        st.markdown("---")
+        st.subheader("Transaction Types")
+        
+        filtered_table = Filtered_data(successful_data_v)
+
+        col1, col2 = st.columns([1,2])
+
+        with col1:
+            PieChartProcessTypes(filtered_table)
+
+        with col2:
+            ProcessTypeBarGraph(filtered_table)
+
+    with st.container():
+        pivote_data = GrowthTrend(filtered_table)
+
+        col1, col2 = st.columns([1,2])
+        with col1:
+            st.write(pivote_data)
+        with col2:          
+            growthTrendGraph(pivote_data)
+
+
+ 
+
+    with st.container():
+        st.subheader("Top Day of the Week")
+
+        col1, col2 = st.columns([1,2])
+       
+        week_day_transaction_count = Grouped_data_dayOfWeek(successful_data_v)
+
+        with col1:
+            st.write(PivotWeekDayPrcessType(week_day_transaction_count))
+
+        with col2:
+            TopDayOfWeekPlot(week_day_transaction_count, ordered_days)
+
+
+
+
+    with st.container():
+        st.markdown("---")
+
+        st.subheader('Quarterly Processed Transaction Summary')
+        col1, col2 = st.columns([2,1])
 
         # Resample the data to quarterly counts
         quarterly_counts = successful_data_v.resample('Q', on=PAYMENT_DATE_COLUMN).size()    
@@ -324,57 +468,13 @@ if csv_file is not None:
         })
 
 
-
-        with col3:
-          
-            st.write('**Total Transaction Count Per Quarter**')
-            st.dataframe(quarterly_summary.style)
-            st.write('**Total Transaction Amount Per Quarter**')
-            st.dataframe(quarterly_volume_summary.style)
-            
         with col1:
-            Monthly_count_bar_graph(successful_data_v)
+            Quarterly_count_bar_graph(quarterly_summary)
+            # Monthly_count_bar_graph(successful_data_v)
 
         with col2:
             Quarterly_Count_Pie_chart(quarterly_summary)
        
-        st.markdown("---")
-
-
-    with st.container():
-
-        st.subheader("Transaction Types")
-        filtered_table = Filtered_data(successful_data_v)
-
-        col3,col1, col2, = st.columns([1,2,2])
-
-        with col1:
-            PieChartProcessTypes(filtered_table)
-
-        with col2:
-            ProcessTypeLineGraph(filtered_table)
-
-        with col3:
-            st.write(filtered_table,use_container_width=True)
-
-        st.markdown("---")
-
-
-    with st.container():
-        st.subheader("Top Day of the Week")
-
-        col1, col2 = st.columns([1,2])
-       
-        week_day_transaction_count = Grouped_data_dayOfWeek(successful_data_v)
-
-        with col1:
-            st.write(week_day_transaction_count)
-
-        with col2:
-            TopDayOfWeekPlot(week_day_transaction_count, ordered_days)
-
-
-    st.markdown("---")
 
     with st.container():
         st.subheader("Transaction Data Tables")
