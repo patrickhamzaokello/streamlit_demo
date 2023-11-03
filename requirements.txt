@@ -2,3 +2,5 @@ streamlit
 pandas
 plotly
 requests
+humanize
+plotly_express

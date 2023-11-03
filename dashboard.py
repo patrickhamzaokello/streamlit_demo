@@ -105,6 +105,7 @@ def declinedTransactions(processed_data):
 
 @st.cache_data
 def Quarterly_Count_Pie_chart(quarterly_summary):    
+    st.subheader("Distribution of Transaction Types by Quarter")
     fig = px.pie(quarterly_summary, 
                  values='TransactionCount', names='Quarter', 
                  labels='Quarter', 
@@ -141,7 +142,7 @@ def Monthly_count_bar_graph(successful_data_v):
 
 @st.cache_data
 def Quarterly_count_bar_graph(quarterly_data_v):
-
+    st.subheader("Comparison of Transaction Counts by Quarter")
     # Create a bar graph using Plotly with month names on the x-axis
     fig = px.bar(quarterly_data_v,
         x='Quarter',  # Format month names
@@ -181,6 +182,7 @@ def Filtered_data(successful_data_v):
 
 @st.cache_data
 def PieChartProcessTypes(filtered_data):
+    st.subheader("**Distribution of Transaction Types by Count**")
     fig = px.pie(
         filtered_data, 
         values='Count', 
@@ -189,7 +191,7 @@ def PieChartProcessTypes(filtered_data):
         )
     fig.update_traces(textposition='inside', textinfo='percent+label')
     fig.update_layout(
-        title=f'Process Type Contribution',
+        title=f'Percentage of Total Transactions for Each Type',
         legend=dict(orientation='v', y=1, x=-0.1),
     )
     st.plotly_chart(fig,use_container_width=True)
@@ -216,6 +218,7 @@ def ProcessTypeLineGraph(filtered_data):
 
 @st.cache_data
 def ProcessTypeBarGraph(filtered_data):
+    st.subheader("Comparison of Transaction Types by Count Over Time")
     # Pivot the DataFrame to create a suitable format for the grouped bar graph
     pivoted_data = filtered_data.pivot(index=PAYMENT_DATE_COLUMN, columns='ProcessType', values='Count')
 
@@ -225,7 +228,7 @@ def ProcessTypeBarGraph(filtered_data):
     # Create a grouped bar graph using Plotly Express
     fig = px.bar(pivoted_data, x=pivoted_data.index, 
                  y=pivoted_data.columns, 
-                 title='Monthly Transaction Count by Process Type', 
+                 title='Monthly Transaction Type Breakdown', 
                  text='ProcessType',
                  color_discrete_sequence=px.colors.sequential.Aggrnyl
                  )
@@ -258,6 +261,7 @@ def PivotWeekDayPrcessType(week_day_name_count):
 
 @st.cache_data
 def TopDayOfWeekPlot(grouped_data,ordered_days):
+    st.subheader("**Transaction Type Analysis by Day of the Week**")
     fig = px.bar(
         grouped_data, 
         x=PAYMENT_DATE_COLUMN, 
@@ -271,7 +275,7 @@ def TopDayOfWeekPlot(grouped_data,ordered_days):
 
     # Customize the layout
     fig.update_layout(
-        title='Total Count of Each ProcessType Description Grouped by Day of the Week',
+        title='Stacked View of Transaction Types Total Count by Weekday',
         xaxis_title='Day of the Week',
         yaxis_title='Total Count',
         legend=dict(orientation='h', y=-0.2, x=-0.1),
@@ -314,6 +318,7 @@ def GrowthTrend(filtered_data):
 
 
 def growthTrendGraph(pivoted_data_table):
+    st.subheader("Comparison of Transaction Counts Over Time")
     # Create a bar graph for the monthly total counts
     bar_fig = px.bar(pivoted_data_table, x=pivoted_data_table.index, y='MonthlyTotalCounts', 
                      title='Monthly Transaction Count', text='MonthlyTotalCounts',   color_discrete_sequence=px.colors.sequential.Aggrnyl)
@@ -388,7 +393,7 @@ if csv_file is not None:
 
     with st.container():
 
-        st.title(f"Analysing GAPS Transaction History In {selected_year}")
+        st.title(f"GAPS Transaction In {selected_year}")
        
         st.markdown("---")
         st.subheader("Metrics")
@@ -417,10 +422,12 @@ if csv_file is not None:
 
     with st.container():
 
-        st.markdown("---")
-        st.subheader("Transaction Types")
+        st.header("Transaction Count Analysis")
+        st.write("**An In-depth Examination of Transaction Counts and Types**")
         
         filtered_table = Filtered_data(successful_data_v)
+        pivote_data = GrowthTrend(filtered_table)
+
 
         col1, col2 = st.columns([1,2])
 
@@ -428,16 +435,16 @@ if csv_file is not None:
             PieChartProcessTypes(filtered_table)
 
         with col2:
-            ProcessTypeBarGraph(filtered_table)
+            growthTrendGraph(pivote_data)
 
     with st.container():
-        pivote_data = GrowthTrend(filtered_table)
 
         col1, col2 = st.columns([1,2])
         with col1:
             st.write(pivote_data)
         with col2:          
-            growthTrendGraph(pivote_data)
+            ProcessTypeBarGraph(filtered_table)
+            
 
 
  
@@ -459,9 +466,9 @@ if csv_file is not None:
 
 
     with st.container():
-        st.markdown("---")
 
-        st.subheader('Quarterly Processed Transaction Summary')
+        st.subheader('Quarterly Transaction Count Analysis')
+        st.write("**An Overview of Transaction Counts by Quarter, Presented Through Bar Graphs and Pie Charts**")
         col1, col2 = st.columns([2,1])
 
         # Resample the data to quarterly counts
