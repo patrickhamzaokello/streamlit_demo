@@ -3,4 +3,4 @@ pandas
 plotly
 requests
 humanize
-plotly_express
+plotly-express
