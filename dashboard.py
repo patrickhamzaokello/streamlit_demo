@@ -418,12 +418,37 @@ if csv_file is not None:
             number_to_display = 4
             usersTop(successful_data_v, number_to_display)
 
+    with st.container():
+        col2,col1 = st.columns([2,1])
+        with col1:
+            result = successful_data_v.groupby('ProcessType_Description').agg({
+                'CompanyName': 'nunique',  # Count unique company names
+                'Amount': 'sum'          # Calculate the sum of Amount
+            }).rename(columns={'CompanyName': 'TotalCompanies', 'Amount': 'TotalAmount'})
+
+            st.write(result)
+
+            # desired_process_type = 'GTB'
+
+            # companies_for_desired_process = successful_data_v[successful_data_v['ProcessType_Description'] == desired_process_type]
+            # st.write(companies_for_desired_process)
+        with col2:
+            result_df = {
+                'ProcessType_Description': result.index,
+                'TotalCompanies': result['TotalCompanies']
+            }
+
+            # Create the pie chart
+            fig = px.pie(result_df, names='ProcessType_Description', values='TotalCompanies',color_discrete_sequence=px.colors.sequential.Aggrnyl, title='Distribution of Companies by Process Type')
+            st.plotly_chart(fig,use_container_width=True)
+
+            st.write("This pie chart illustrates the proportion of companies participating in different process types. Each slice represents a unique process type, and the size of the slice corresponds to the number of companies associated with that process type.")
+
 
 
     with st.container():
 
-        st.header("Transaction Count Analysis")
-        st.write("**An In-depth Examination of Transaction Counts and Types**")
+        st.header("Transaction Count and Types Analysis")
         
         filtered_table = Filtered_data(successful_data_v)
         pivote_data = GrowthTrend(filtered_table)
@@ -444,8 +469,6 @@ if csv_file is not None:
             st.write(pivote_data)
         with col2:          
             ProcessTypeBarGraph(filtered_table)
-            
-
 
  
 
